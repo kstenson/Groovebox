@@ -3,6 +3,8 @@ import { NavBar } from './components/NavBar'
 import { HomePage } from './pages/HomePage'
 import { GrooveboxPage } from './pages/GrooveboxPage'
 import { SynthPage } from './pages/SynthPage'
+import { FMSynthPage } from './pages/FMSynthPage'
+import { DrumPadsPage } from './pages/DrumPadsPage'
 
 export default function App() {
   const route = useHashRoute()
@@ -16,6 +18,12 @@ export default function App() {
       break
     case '/op-1':
       page = <SynthPage key="op-1" />
+      break
+    case '/fm':
+      page = <FMSynthPage key="fm" />
+      break
+    case '/pads':
+      page = <DrumPadsPage key="pads" />
       break
     default:
       page = <HomePage key="home" />

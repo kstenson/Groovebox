@@ -24,6 +24,20 @@ const INSTRUMENTS: Instrument[] = [
     accent: '#ff7a3d',
     glyph: '◍',
   },
+  {
+    path: '/fm',
+    name: 'FM Synth',
+    tagline: '2-operator FM · bells, electric pianos & mallets',
+    accent: '#ff5d9e',
+    glyph: '✺',
+  },
+  {
+    path: '/pads',
+    name: 'Drum Pads',
+    tagline: 'MPC-style pads · play the kit by hand',
+    accent: '#ffd23d',
+    glyph: '⊞',
+  },
 ]
 
 export function HomePage() {

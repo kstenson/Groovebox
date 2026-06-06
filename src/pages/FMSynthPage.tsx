@@ -1,28 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { PolySynth, DEFAULT_MACROS, type SynthMacros } from '../audio/PolySynth'
+import { FMSynth, DEFAULT_FM_MACROS, type FMMacros } from '../audio/FMSynth'
 import { Knob } from '../components/Knob'
 import { Keyboard } from '../components/Keyboard'
 import { Scope } from '../components/Scope'
 import { KEY_MAP, useComputerKeyboard } from '../hooks/useComputerKeyboard'
 
-// OP-1's four signature encoder colours.
 const COLORS = {
-  blue: '#3da5ff',
-  green: '#4cd07d',
-  white: '#f2f2f5',
-  orange: '#ff7a3d',
+  pink: '#ff5d9e',
+  yellow: '#ffd23d',
+  cyan: '#36d1c4',
+  purple: '#9b6cff',
 }
 
-export function SynthPage() {
-  const synthRef = useRef<PolySynth | null>(null)
-  if (synthRef.current === null) synthRef.current = new PolySynth()
+export function FMSynthPage() {
+  const synthRef = useRef<FMSynth | null>(null)
+  if (synthRef.current === null) synthRef.current = new FMSynth()
   const synth = synthRef.current
 
-  const [macros, setMacros] = useState<SynthMacros>({ ...DEFAULT_MACROS })
+  const [macros, setMacros] = useState<FMMacros>({ ...DEFAULT_FM_MACROS })
   const [octave, setOctave] = useState(4)
   const [active, setActive] = useState<Set<number>>(() => new Set())
 
-  const baseMidi = 12 * (octave + 1) // C of the current octave (C4 = 60)
+  const baseMidi = 12 * (octave + 1)
 
   const noteOn = useCallback(
     (midi: number) => {
@@ -45,7 +44,7 @@ export function SynthPage() {
   )
 
   const setMacro = useCallback(
-    (patch: Partial<SynthMacros>) => {
+    (patch: Partial<FMMacros>) => {
       synth.setMacros(patch)
       setMacros((m) => ({ ...m, ...patch }))
     },
@@ -62,20 +61,20 @@ export function SynthPage() {
 
   return (
     <div className="op1">
-      <div className="op1-body">
+      <div className="op1-body fm-body">
         <div className="op1-screen">
-          <Scope getAnalyser={getAnalyser} colors={[COLORS.blue, COLORS.green, COLORS.orange]} />
+          <Scope getAnalyser={getAnalyser} colors={[COLORS.pink, COLORS.yellow, COLORS.cyan]} />
           <div className="op1-screen-label">
-            <span>SYNTH · CLUSTER</span>
+            <span>FM · 2-OP</span>
             <span>OCT {octave}</span>
           </div>
         </div>
 
         <div className="op1-encoders">
-          <Knob label="SPREAD" color={COLORS.blue} value={macros.spread} min={0} max={1} format={(v) => `${Math.round(v * 100)}`} onChange={(v) => setMacro({ spread: v })} size={64} />
-          <Knob label="CUTOFF" color={COLORS.green} value={macros.cutoff} min={0} max={1} format={(v) => `${Math.round(v * 100)}`} onChange={(v) => setMacro({ cutoff: v })} size={64} />
-          <Knob label="ENV" color={COLORS.white} value={macros.env} min={0} max={1} format={(v) => `${Math.round(v * 100)}`} onChange={(v) => setMacro({ env: v })} size={64} />
-          <Knob label="FX" color={COLORS.orange} value={macros.fx} min={0} max={1} format={(v) => `${Math.round(v * 100)}`} onChange={(v) => setMacro({ fx: v })} size={64} />
+          <Knob label="RATIO" color={COLORS.pink} value={macros.ratio} min={0} max={1} format={(v) => `${Math.round(v * 100)}`} onChange={(v) => setMacro({ ratio: v })} size={64} />
+          <Knob label="FM" color={COLORS.yellow} value={macros.depth} min={0} max={1} format={(v) => `${Math.round(v * 100)}`} onChange={(v) => setMacro({ depth: v })} size={64} />
+          <Knob label="DECAY" color={COLORS.cyan} value={macros.decay} min={0} max={1} format={(v) => `${Math.round(v * 100)}`} onChange={(v) => setMacro({ decay: v })} size={64} />
+          <Knob label="FX" color={COLORS.purple} value={macros.fx} min={0} max={1} format={(v) => `${Math.round(v * 100)}`} onChange={(v) => setMacro({ fx: v })} size={64} />
         </div>
 
         <div className="op1-octave">
@@ -87,8 +86,8 @@ export function SynthPage() {
         <Keyboard startMidi={baseMidi} octaves={2} activeNotes={active} onNoteOn={noteOn} onNoteOff={noteOff} keyHints={keyHints} />
 
         <p className="hint">
-          Play with your mouse or computer keys (A–K row) · Z / X shift octave · the four coloured
-          encoders shape the sound, just like an OP-1.
+          A 2-operator FM voice — bells, electric pianos, mallets. Crank FM for bite, RATIO for
+          harmonic colour, DECAY for pluck vs. sustain. Play with mouse or the A–K keys.
         </p>
       </div>
     </div>

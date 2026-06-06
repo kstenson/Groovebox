@@ -703,3 +703,51 @@ select {
 .bkey .key-hint {
   color: #ddd;
 }
+
+/* ----- FM synth body tint ----- */
+.fm-body {
+  background: linear-gradient(180deg, #f0e8ef, #ddd2dd);
+  border-color: #cbbfca;
+}
+
+/* ----- Drum pads ----- */
+.pads {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+}
+.pad {
+  --pad-color: #ff7a3d;
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  border: 1px solid #c2c2c8;
+  background: linear-gradient(180deg, #fafafb, #e3e3e7);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform 0.05s ease, box-shadow 0.08s ease, background 0.08s ease;
+}
+.pad:active,
+.pad.hit {
+  background: radial-gradient(circle at 50% 40%, var(--pad-color), #d8d8dd);
+  box-shadow: 0 0 22px -2px var(--pad-color);
+  transform: scale(0.97);
+}
+.pad-key {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--pad-color);
+}
+.pad.hit .pad-key {
+  color: #1a1a22;
+}
+.pad-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a4a55;
+  letter-spacing: 1px;
+}

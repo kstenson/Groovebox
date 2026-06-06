@@ -9,6 +9,8 @@ const NAV: NavItem[] = [
   { path: '/', label: 'Home' },
   { path: '/groovebox', label: 'Groovebox' },
   { path: '/op-1', label: 'Cluster Synth' },
+  { path: '/fm', label: 'FM Synth' },
+  { path: '/pads', label: 'Drum Pads' },
 ]
 
 export function NavBar({ current }: { current: string }) {
