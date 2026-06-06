@@ -948,3 +948,22 @@ select {
   background: #fff;
   border-color: #fff;
 }
+
+/* ----- Drum pad sound picker ----- */
+.pad-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pad-cell .pad {
+  width: 100%;
+}
+.pad-select {
+  width: 100%;
+  font-size: 11px;
+  padding: 4px 6px;
+  background: #1b1b27;
+  color: var(--text);
+  border: 1px solid #c2c2c8;
+  border-radius: 6px;
+}

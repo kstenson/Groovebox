@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { DrumKit } from '../audio/DrumKit'
 import type { DrumVoiceId } from '../audio/types'
+import {
+  DEFAULT_ASSIGNMENTS,
+  DRUM_CATALOG,
+  DRUM_CATEGORIES,
+  SYNTH_OPTION,
+  soundById,
+} from '../audio/drumSamples'
 import { Scope } from '../components/Scope'
 
 interface Pad {
@@ -18,7 +25,7 @@ const PADS: Pad[] = [
   { id: 'openHat', name: 'OH', key: 'g', color: '#4cd07d' },
 ]
 
-type SampleStatus = 'loading' | 'ready' | 'synth'
+type Status = 'loading' | 'ready'
 
 export function DrumPadsPage() {
   const kitRef = useRef<DrumKit | null>(null)
@@ -27,29 +34,22 @@ export function DrumPadsPage() {
 
   const [flash, setFlash] = useState<Set<DrumVoiceId>>(() => new Set())
   const flashTimers = useRef<Map<DrumVoiceId, number>>(new Map())
-  const [useSamples, setUseSamples] = useState(true)
-  const [status, setStatus] = useState<SampleStatus>('loading')
-  const useSamplesRef = useRef(useSamples)
-  useSamplesRef.current = useSamples
+  const [assignments, setAssignments] = useState<Record<DrumVoiceId, string>>(DEFAULT_ASSIGNMENTS)
+  const [status, setStatus] = useState<Status>('loading')
 
-  // Pull the Strudel/Dirt samples once on mount; fall back to synth on failure.
+  // Keep a ref so the keydown/hit handlers always see current assignments.
+  const assignRef = useRef(assignments)
+  assignRef.current = assignments
+
+  // Preload the default sounds on mount.
   useEffect(() => {
     let cancelled = false
-    kit
-      .loadSamples()
-      .then((loaded) => {
-        if (cancelled) return
-        if (loaded > 0) setStatus('ready')
-        else {
-          setStatus('synth')
-          setUseSamples(false)
-        }
-      })
-      .catch(() => {
-        if (cancelled) return
-        setStatus('synth')
-        setUseSamples(false)
-      })
+    const urls = Object.values(DEFAULT_ASSIGNMENTS)
+      .map((id) => soundById(id)?.url)
+      .filter((u): u is string => !!u)
+    Promise.all(urls.map((u) => kit.loadSample(u))).then(() => {
+      if (!cancelled) setStatus('ready')
+    })
     return () => {
       cancelled = true
     }
@@ -57,7 +57,11 @@ export function DrumPadsPage() {
 
   const hit = useCallback(
     (id: DrumVoiceId) => {
-      kit.play(id, useSamplesRef.current)
+      const assignment = assignRef.current[id]
+      const sound = assignment === SYNTH_OPTION ? undefined : soundById(assignment)
+      // Use the sample if it's decoded; otherwise fall back to the synth voice.
+      if (!sound || !kit.playUrl(sound.url)) kit.playSynth(id)
+
       setFlash((prev) => new Set(prev).add(id))
       const timers = flashTimers.current
       if (timers.has(id)) window.clearTimeout(timers.get(id))
@@ -71,6 +75,15 @@ export function DrumPadsPage() {
           })
         }, 120),
       )
+    },
+    [kit],
+  )
+
+  const assignSound = useCallback(
+    (padId: DrumVoiceId, soundId: string) => {
+      setAssignments((a) => ({ ...a, [padId]: soundId }))
+      const sound = soundById(soundId)
+      if (sound) void kit.loadSample(sound.url) // warm the cache
     },
     [kit],
   )
@@ -104,50 +117,49 @@ export function DrumPadsPage() {
           <Scope getAnalyser={getAnalyser} colors={['#ff7a3d', '#ffd23d', '#36d1c4']} />
           <div className="op1-screen-label">
             <span>DRUM PADS</span>
-            <span>
-              {status === 'loading'
-                ? 'LOADING SAMPLES…'
-                : status === 'synth'
-                  ? 'SYNTH (offline)'
-                  : useSamples
-                    ? 'DIRT SAMPLES'
-                    : 'SYNTH'}
-            </span>
+            <span>{status === 'loading' ? 'LOADING…' : 'CLASSIC KIT'}</span>
           </div>
-        </div>
-
-        <div className="op1-octave">
-          <button
-            className={`ghost-btn ${useSamples ? 'on' : ''}`}
-            disabled={status !== 'ready'}
-            onClick={() => setUseSamples((v) => !v)}
-          >
-            {useSamples ? '◉ Samples' : '○ Samples'}
-          </button>
-          <span>{useSamples ? 'Strudel / Dirt one-shots' : 'Synthesized voices'}</span>
         </div>
 
         <div className="pads">
           {PADS.map((pad) => (
-            <button
-              key={pad.id}
-              className={`pad ${flash.has(pad.id) ? 'hit' : ''}`}
-              style={{ '--pad-color': pad.color } as CSSProperties}
-              onPointerDown={(e) => {
-                e.preventDefault()
-                hit(pad.id)
-              }}
-            >
-              <span className="pad-key">{pad.key.toUpperCase()}</span>
-              <span className="pad-name">{pad.name}</span>
-            </button>
+            <div className="pad-cell" key={pad.id}>
+              <button
+                className={`pad ${flash.has(pad.id) ? 'hit' : ''}`}
+                style={{ '--pad-color': pad.color } as CSSProperties}
+                onPointerDown={(e) => {
+                  e.preventDefault()
+                  hit(pad.id)
+                }}
+              >
+                <span className="pad-key">{pad.key.toUpperCase()}</span>
+                <span className="pad-name">{pad.name}</span>
+              </button>
+              <select
+                className="pad-select"
+                value={assignments[pad.id]}
+                onChange={(e) => assignSound(pad.id, e.target.value)}
+                aria-label={`${pad.name} sound`}
+              >
+                <option value={SYNTH_OPTION}>Synth</option>
+                {DRUM_CATEGORIES.map((cat) => (
+                  <optgroup key={cat} label={cat}>
+                    {DRUM_CATALOG.filter((s) => s.category === cat).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
           ))}
         </div>
 
         <p className="hint">
-          Tap the pads or hit the A–S–D–F–G keys. Plays one-shot samples from Strudel's Dirt-Samples
-          library (loaded from the web) — toggle to the synthesized voices any time, and the kit
-          falls back to synth automatically if the samples can't be fetched.
+          Tap the pads or hit the A–S–D–F–G keys. Pick a classic drum sound for each pad from the
+          dropdown (808 / 909 / Dirt one-shots, loaded from the web) — choose <strong>Synth</strong>{' '}
+          for the built-in synthesized voice. Pads fall back to synth if a sample can't be fetched.
         </p>
       </div>
     </div>
