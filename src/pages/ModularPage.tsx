@@ -4,6 +4,7 @@ import { Knob } from '../components/Knob'
 import {
   MODULE_DEFS,
   isOutputJack,
+  jackGroup,
   jackKey,
   type Cable,
   type JackKind,
@@ -42,8 +43,11 @@ const defaultParams = (type: ModuleType): Record<string, number> => {
   return out
 }
 
-const jackColor = (kind: JackKind) =>
-  kind === 'audioOut' || kind === 'audioIn' ? '#ff7a3d' : '#36d1c4'
+const jackColor = (kind: JackKind) => {
+  if (kind === 'audioOut' || kind === 'audioIn') return '#ff7a3d'
+  if (kind === 'gateOut' || kind === 'gateIn') return '#ffd23d'
+  return '#36d1c4'
+}
 
 type Pos = { x: number; y: number }
 
@@ -109,7 +113,7 @@ export function ModularPage() {
   }, [])
 
   // ---- Cable dragging ----
-  const [drag, setDrag] = useState<{ from: JackRef; isOutput: boolean } | null>(null)
+  const [drag, setDrag] = useState<{ from: JackRef; kind: JackKind } | null>(null)
   const dragRef = useRef<typeof drag>(null)
   dragRef.current = drag
   const [pointer, setPointer] = useState<Pos | null>(null)
@@ -124,7 +128,7 @@ export function ModularPage() {
   const onJackDown = (ref: JackRef, kind: JackKind) => (e: React.PointerEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setDrag({ from: ref, isOutput: isOutputJack(kind) })
+    setDrag({ from: ref, kind })
     setPointer(toLocal(e))
   }
 
@@ -132,10 +136,13 @@ export function ModularPage() {
     e.stopPropagation()
     const a = dragRef.current
     if (!a) return
-    const targetIsOutput = isOutputJack(kind)
-    if (a.isOutput !== targetIsOutput) {
-      const from = a.isOutput ? a.from : ref
-      const to = a.isOutput ? ref : a.from
+    const aIsOutput = isOutputJack(a.kind)
+    // One end must be an output and the other an input, and both must belong to
+    // the same group (gate <-> gate, or signal <-> signal).
+    const compatible = aIsOutput !== isOutputJack(kind) && jackGroup(a.kind) === jackGroup(kind)
+    if (compatible) {
+      const from = aIsOutput ? a.from : ref
+      const to = aIsOutput ? ref : a.from
       const dup = cables.some(
         (c) =>
           c.from.moduleId === from.moduleId &&
@@ -246,7 +253,7 @@ export function ModularPage() {
         </button>
         <div className="add-palette">
           <span className="ctrl-label">ADD</span>
-          {(['vco', 'lfo', 'noise', 'vcf', 'vca'] as ModuleType[]).map((t) => (
+          {(['vco', 'lfo', 'noise', 'vcf', 'vca', 'clock', 'env', 'snh'] as ModuleType[]).map((t) => (
             <button key={t} className="ghost-btn" onClick={() => addModule(t)}>
               + {MODULE_DEFS[t].name}
             </button>
@@ -343,9 +350,10 @@ export function ModularPage() {
       </div>
 
       <p className="hint">
-        Drag a cable from one jack to another to patch (orange = audio, teal = control voltage) ·
-        click a cable to remove it · try patching the LFO into a VCO's PITCH, or add a NOISE into the
-        VCF. Hit <strong>Enable Audio</strong> to hear it.
+        Drag a cable from one jack to another to patch (orange = audio, teal = CV, yellow = gate) ·
+        click a cable to remove it · for a rhythmic patch: add a CLOCK + ENV, patch CLOCK gate → ENV
+        gate and ENV out → a VCA's GAIN CV (turn the VCA gain down first). Add an S&H into a VCO's
+        PITCH for random melodies. Hit <strong>Enable Audio</strong> to hear it.
       </p>
     </div>
   )

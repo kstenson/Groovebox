@@ -3,7 +3,7 @@
 // including connecting an output into an AudioParam (control-voltage style
 // modulation), which is how an LFO can wobble a filter's cutoff.
 
-import type { JackRef, ModuleType } from '../modular/defs'
+import { MODULE_DEFS, jackKey, type JackRef, type ModuleType } from '../modular/defs'
 
 interface EngineModule {
   type: ModuleType
@@ -15,6 +15,8 @@ interface EngineModule {
   cvInputs: Map<string, AudioParam>
   setParam: (id: string, value: number) => void
   setWaveform?: (w: OscillatorType) => void
+  /** Called when a gate/trigger arrives at one of the module's gate inputs. */
+  onGate?: (jack: string, time: number, value: number) => void
   stop: () => void
 }
 
@@ -22,6 +24,8 @@ export class ModularEngine {
   private ctx: AudioContext | null = null
   private modules = new Map<string, EngineModule>()
   private noiseBuffer: AudioBuffer | null = null
+  /** Logical gate/trigger wiring: source jack key -> target jack refs. */
+  private gateTargets = new Map<string, JackRef[]>()
 
   private ensure(): AudioContext {
     if (!this.ctx) this.ctx = new AudioContext()
@@ -54,7 +58,21 @@ export class ModularEngine {
   addModule(id: string, type: ModuleType) {
     const ctx = this.ensure()
     if (this.modules.has(id)) return
-    this.modules.set(id, this.createModule(ctx, type))
+    const emit = (jack: string, time: number, value = 1) => this.fireGate(id, jack, time, value)
+    this.modules.set(id, this.createModule(ctx, type, emit))
+  }
+
+  /** Route a gate pulse from a source jack to every connected gate input. */
+  private fireGate(fromId: string, jack: string, time: number, value: number) {
+    const targets = this.gateTargets.get(jackKey(fromId, jack))
+    if (!targets) return
+    for (const t of targets) this.modules.get(t.moduleId)?.onGate?.(t.jack, time, value)
+  }
+
+  private jackKindOf(ref: JackRef) {
+    const type = this.modules.get(ref.moduleId)?.type
+    if (!type) return null
+    return MODULE_DEFS[type].jacks.find((j) => j.id === ref.jack)?.kind ?? null
   }
 
   removeModule(id: string) {
@@ -81,6 +99,14 @@ export class ModularEngine {
   }
 
   connect(from: JackRef, to: JackRef): boolean {
+    // Gate cables are wired logically, not through the audio graph.
+    if (this.jackKindOf(from) === 'gateOut') {
+      const key = jackKey(from.moduleId, from.jack)
+      const list = this.gateTargets.get(key) ?? []
+      list.push(to)
+      this.gateTargets.set(key, list)
+      return true
+    }
     const src = this.modules.get(from.moduleId)?.outputs.get(from.jack)
     const dest = this.resolveDest(to)
     if (!src || !dest) return false
@@ -90,6 +116,15 @@ export class ModularEngine {
   }
 
   disconnect(from: JackRef, to: JackRef) {
+    if (this.jackKindOf(from) === 'gateOut') {
+      const key = jackKey(from.moduleId, from.jack)
+      const list = (this.gateTargets.get(key) ?? []).filter(
+        (t) => !(t.moduleId === to.moduleId && t.jack === to.jack),
+      )
+      if (list.length) this.gateTargets.set(key, list)
+      else this.gateTargets.delete(key)
+      return
+    }
     const src = this.modules.get(from.moduleId)?.outputs.get(from.jack)
     const dest = this.resolveDest(to)
     if (!src || !dest) return
@@ -101,7 +136,11 @@ export class ModularEngine {
     }
   }
 
-  private createModule(ctx: AudioContext, type: ModuleType): EngineModule {
+  private createModule(
+    ctx: AudioContext,
+    type: ModuleType,
+    emit: (jack: string, time: number, value?: number) => void,
+  ): EngineModule {
     const outputs = new Map<string, AudioNode>()
     const audioInputs = new Map<string, AudioNode>()
     const cvInputs = new Map<string, AudioParam>()
@@ -224,11 +263,97 @@ export class ModularEngine {
           stop: () => gain.disconnect(),
         }
       }
+      case 'clock': {
+        // A look-ahead scheduler emits eighth-note gate pulses against the
+        // audio clock. It idles while the context is suspended so no backlog
+        // of pulses piles up before the user enables audio.
+        let bpm = 120
+        let nextTime = ctx.currentTime
+        const stepDur = () => 60 / bpm / 2
+        const tick = () => {
+          if (ctx.state !== 'running') {
+            nextTime = ctx.currentTime + 0.05
+            return
+          }
+          while (nextTime < ctx.currentTime + 0.1) {
+            emit('gate', nextTime, 1)
+            nextTime += stepDur()
+          }
+        }
+        const timer = window.setInterval(tick, 25)
+        return {
+          type,
+          outputs,
+          audioInputs,
+          cvInputs,
+          setParam: (id, v) => {
+            if (id === 'rate') bpm = v
+          },
+          stop: () => window.clearInterval(timer),
+        }
+      }
+      case 'env': {
+        // AD envelope generator: a ConstantSource whose offset is ramped on
+        // each gate, used as a CV source into params (VCA gain, filter cutoff…).
+        const cv = ctx.createConstantSource()
+        cv.offset.value = 0
+        cv.start()
+        outputs.set('out', cv)
+        let attack = 0.01
+        let decay = 0.3
+        let amount = 1
+        return {
+          type,
+          outputs,
+          audioInputs,
+          cvInputs,
+          setParam: (id, v) => {
+            if (id === 'attack') attack = v
+            if (id === 'decay') decay = v
+            if (id === 'amount') amount = v
+          },
+          onGate: (_jack, time) => {
+            const t = Math.max(time, ctx.currentTime)
+            cv.offset.cancelScheduledValues(t)
+            cv.offset.setValueAtTime(0, t)
+            cv.offset.linearRampToValueAtTime(amount, t + attack)
+            cv.offset.linearRampToValueAtTime(0, t + attack + decay)
+          },
+          stop: () => cv.stop(),
+        }
+      }
+      case 'snh': {
+        // Sample & hold: latch a fresh random value on each trigger.
+        const cv = ctx.createConstantSource()
+        cv.offset.value = 0
+        cv.start()
+        outputs.set('out', cv)
+        let range = 600
+        let glide = 0
+        return {
+          type,
+          outputs,
+          audioInputs,
+          cvInputs,
+          setParam: (id, v) => {
+            if (id === 'range') range = v
+            if (id === 'glide') glide = v
+          },
+          onGate: (_jack, time) => {
+            const t = Math.max(time, ctx.currentTime)
+            const value = Math.random() * range
+            if (glide > 0) cv.offset.setTargetAtTime(value, t, glide)
+            else cv.offset.setValueAtTime(value, t)
+          },
+          stop: () => cv.stop(),
+        }
+      }
     }
   }
 
   dispose() {
     for (const id of [...this.modules.keys()]) this.removeModule(id)
+    this.gateTargets.clear()
     this.ctx?.close()
     this.ctx = null
     this.noiseBuffer = null
