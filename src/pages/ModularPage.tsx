@@ -253,7 +253,22 @@ export function ModularPage() {
         </button>
         <div className="add-palette">
           <span className="ctrl-label">ADD</span>
-          {(['vco', 'lfo', 'noise', 'vcf', 'vca', 'clock', 'env', 'snh'] as ModuleType[]).map((t) => (
+          {(
+            [
+              'vco',
+              'lfo',
+              'noise',
+              'vcf',
+              'vca',
+              'clock',
+              'env',
+              'snh',
+              'mix',
+              'delay',
+              'drive',
+              'atten',
+            ] as ModuleType[]
+          ).map((t) => (
             <button key={t} className="ghost-btn" onClick={() => addModule(t)}>
               + {MODULE_DEFS[t].name}
             </button>

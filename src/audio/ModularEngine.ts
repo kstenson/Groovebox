@@ -348,6 +348,107 @@ export class ModularEngine {
           stop: () => cv.stop(),
         }
       }
+      case 'mix': {
+        const out = ctx.createGain()
+        const makeIn = (level: number) => {
+          const g = ctx.createGain()
+          g.gain.value = level
+          g.connect(out)
+          return g
+        }
+        const g1 = makeIn(0.7)
+        const g2 = makeIn(0.7)
+        const g3 = makeIn(0.7)
+        audioInputs.set('in1', g1)
+        audioInputs.set('in2', g2)
+        audioInputs.set('in3', g3)
+        outputs.set('out', out)
+        return {
+          type,
+          outputs,
+          audioInputs,
+          cvInputs,
+          setParam: (id, v) => {
+            if (id === 'lvl1') g1.gain.setTargetAtTime(v, set(), 0.01)
+            if (id === 'lvl2') g2.gain.setTargetAtTime(v, set(), 0.01)
+            if (id === 'lvl3') g3.gain.setTargetAtTime(v, set(), 0.01)
+          },
+          stop: () => {},
+        }
+      }
+      case 'delay': {
+        const input = ctx.createGain()
+        const out = ctx.createGain()
+        const delay = ctx.createDelay(1)
+        delay.delayTime.value = 0.3
+        const fb = ctx.createGain()
+        fb.gain.value = 0.35
+        const wet = ctx.createGain()
+        wet.gain.value = 0.4
+        input.connect(out) // dry path
+        input.connect(delay)
+        delay.connect(fb)
+        fb.connect(delay) // feedback loop
+        delay.connect(wet)
+        wet.connect(out)
+        audioInputs.set('in', input)
+        outputs.set('out', out)
+        return {
+          type,
+          outputs,
+          audioInputs,
+          cvInputs,
+          setParam: (id, v) => {
+            if (id === 'time') delay.delayTime.setTargetAtTime(v, set(), 0.02)
+            if (id === 'fbk') fb.gain.setTargetAtTime(v, set(), 0.02)
+            if (id === 'mix') wet.gain.setTargetAtTime(v, set(), 0.02)
+          },
+          stop: () => {},
+        }
+      }
+      case 'drive': {
+        const shaper = ctx.createWaveShaper()
+        shaper.oversample = '2x'
+        const makeCurve = (k: number) => {
+          const n = 1024
+          const curve = new Float32Array(n)
+          for (let i = 0; i < n; i++) {
+            const x = (i / (n - 1)) * 2 - 1
+            curve[i] = Math.tanh(k * x)
+          }
+          return curve
+        }
+        shaper.curve = makeCurve(6)
+        audioInputs.set('in', shaper)
+        outputs.set('out', shaper)
+        return {
+          type,
+          outputs,
+          audioInputs,
+          cvInputs,
+          setParam: (id, v) => {
+            if (id === 'drive') shaper.curve = makeCurve(v)
+          },
+          stop: () => {},
+        }
+      }
+      case 'atten': {
+        // Attenuverter: scale (and optionally invert) any signal or CV.
+        const g = ctx.createGain()
+        g.gain.value = 1
+        audioInputs.set('in', g)
+        outputs.set('out', g)
+        return {
+          type,
+          outputs,
+          audioInputs,
+          cvInputs,
+          setParam: (id, v) => {
+            if (id === 'amount') g.gain.setTargetAtTime(v, set(), 0.01)
+          },
+          stop: () => {},
+        }
+      }
     }
   }
 

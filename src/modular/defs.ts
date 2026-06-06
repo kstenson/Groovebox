@@ -12,6 +12,10 @@ export type ModuleType =
   | 'clock'
   | 'env'
   | 'snh'
+  | 'mix'
+  | 'delay'
+  | 'drive'
+  | 'atten'
 
 export type JackKind = 'audioOut' | 'cvOut' | 'audioIn' | 'cvIn' | 'gateOut' | 'gateIn'
 
@@ -157,6 +161,60 @@ export const MODULE_DEFS: Record<ModuleType, ModuleDef> = {
       { id: 'range', label: 'RANGE', min: 0, max: 2000, default: 600 },
       { id: 'glide', label: 'GLIDE', min: 0, max: 0.3, default: 0 },
     ],
+  },
+  mix: {
+    type: 'mix',
+    name: 'MIXER',
+    accent: '#36d1c4',
+    removable: true,
+    jacks: [
+      { id: 'in1', label: 'IN 1', kind: 'audioIn' },
+      { id: 'in2', label: 'IN 2', kind: 'audioIn' },
+      { id: 'in3', label: 'IN 3', kind: 'audioIn' },
+      { id: 'out', label: 'OUT', kind: 'audioOut' },
+    ],
+    params: [
+      { id: 'lvl1', label: 'LVL 1', min: 0, max: 1, default: 0.7 },
+      { id: 'lvl2', label: 'LVL 2', min: 0, max: 1, default: 0.7 },
+      { id: 'lvl3', label: 'LVL 3', min: 0, max: 1, default: 0.7 },
+    ],
+  },
+  delay: {
+    type: 'delay',
+    name: 'DELAY',
+    accent: '#9b6cff',
+    removable: true,
+    jacks: [
+      { id: 'in', label: 'IN', kind: 'audioIn' },
+      { id: 'out', label: 'OUT', kind: 'audioOut' },
+    ],
+    params: [
+      { id: 'time', label: 'TIME', min: 0.02, max: 0.8, default: 0.3, unit: 's' },
+      { id: 'fbk', label: 'FBK', min: 0, max: 0.9, default: 0.35 },
+      { id: 'mix', label: 'MIX', min: 0, max: 1, default: 0.4 },
+    ],
+  },
+  drive: {
+    type: 'drive',
+    name: 'DRIVE',
+    accent: '#ff7a3d',
+    removable: true,
+    jacks: [
+      { id: 'in', label: 'IN', kind: 'audioIn' },
+      { id: 'out', label: 'OUT', kind: 'audioOut' },
+    ],
+    params: [{ id: 'drive', label: 'DRIVE', min: 1, max: 50, default: 6 }],
+  },
+  atten: {
+    type: 'atten',
+    name: 'ATTEN',
+    accent: '#8a8aa3',
+    removable: true,
+    jacks: [
+      { id: 'in', label: 'IN', kind: 'audioIn' },
+      { id: 'out', label: 'OUT', kind: 'audioOut' },
+    ],
+    params: [{ id: 'amount', label: 'AMOUNT', min: -1, max: 1, default: 1 }],
   },
 }
 
