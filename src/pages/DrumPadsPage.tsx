@@ -18,6 +18,8 @@ const PADS: Pad[] = [
   { id: 'openHat', name: 'OH', key: 'g', color: '#4cd07d' },
 ]
 
+type SampleStatus = 'loading' | 'ready' | 'synth'
+
 export function DrumPadsPage() {
   const kitRef = useRef<DrumKit | null>(null)
   if (kitRef.current === null) kitRef.current = new DrumKit()
@@ -25,10 +27,37 @@ export function DrumPadsPage() {
 
   const [flash, setFlash] = useState<Set<DrumVoiceId>>(() => new Set())
   const flashTimers = useRef<Map<DrumVoiceId, number>>(new Map())
+  const [useSamples, setUseSamples] = useState(true)
+  const [status, setStatus] = useState<SampleStatus>('loading')
+  const useSamplesRef = useRef(useSamples)
+  useSamplesRef.current = useSamples
+
+  // Pull the Strudel/Dirt samples once on mount; fall back to synth on failure.
+  useEffect(() => {
+    let cancelled = false
+    kit
+      .loadSamples()
+      .then((loaded) => {
+        if (cancelled) return
+        if (loaded > 0) setStatus('ready')
+        else {
+          setStatus('synth')
+          setUseSamples(false)
+        }
+      })
+      .catch(() => {
+        if (cancelled) return
+        setStatus('synth')
+        setUseSamples(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [kit])
 
   const hit = useCallback(
     (id: DrumVoiceId) => {
-      kit.play(id)
+      kit.play(id, useSamplesRef.current)
       setFlash((prev) => new Set(prev).add(id))
       const timers = flashTimers.current
       if (timers.has(id)) window.clearTimeout(timers.get(id))
@@ -75,8 +104,27 @@ export function DrumPadsPage() {
           <Scope getAnalyser={getAnalyser} colors={['#ff7a3d', '#ffd23d', '#36d1c4']} />
           <div className="op1-screen-label">
             <span>DRUM PADS</span>
-            <span>A S D F G</span>
+            <span>
+              {status === 'loading'
+                ? 'LOADING SAMPLES…'
+                : status === 'synth'
+                  ? 'SYNTH (offline)'
+                  : useSamples
+                    ? 'DIRT SAMPLES'
+                    : 'SYNTH'}
+            </span>
           </div>
+        </div>
+
+        <div className="op1-octave">
+          <button
+            className={`ghost-btn ${useSamples ? 'on' : ''}`}
+            disabled={status !== 'ready'}
+            onClick={() => setUseSamples((v) => !v)}
+          >
+            {useSamples ? '◉ Samples' : '○ Samples'}
+          </button>
+          <span>{useSamples ? 'Strudel / Dirt one-shots' : 'Synthesized voices'}</span>
         </div>
 
         <div className="pads">
@@ -97,8 +145,9 @@ export function DrumPadsPage() {
         </div>
 
         <p className="hint">
-          Tap the pads or hit the A–S–D–F–G keys. Same synthesized voices as the Groovebox, with a
-          touch of room reverb.
+          Tap the pads or hit the A–S–D–F–G keys. Plays one-shot samples from Strudel's Dirt-Samples
+          library (loaded from the web) — toggle to the synthesized voices any time, and the kit
+          falls back to synth automatically if the samples can't be fetched.
         </p>
       </div>
     </div>

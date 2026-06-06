@@ -1,15 +1,34 @@
-// A tiny standalone drum kit for the pad page. Reuses the synthesized drum
-// voices from voices.ts, with its own AudioContext, a master bus, an analyser
-// for the scope, and a touch of reverb for body.
+// A tiny standalone drum kit for the pad page. It can play either the
+// synthesized voices from voices.ts or real one-shot samples from the public
+// Strudel / TidalCycles "Dirt-Samples" library, with its own AudioContext, a
+// master bus, an analyser for the scope, and a touch of reverb for body.
+//
+// Samples are fetched from raw.githubusercontent.com (permissive CORS). If a
+// sample fails to load, that pad transparently falls back to its synth voice,
+// so the kit still works offline.
 
 import type { DrumVoiceId } from './types'
 import { triggerDrum } from './voices'
+
+const DIRT_BASE = 'https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master'
+
+/** One representative Dirt sample per pad (Strudel's default drum library). */
+export const SAMPLE_URLS: Record<DrumVoiceId, string> = {
+  kick: `${DIRT_BASE}/bd/BT0A0A7.wav`,
+  snare: `${DIRT_BASE}/sd/rytm-00-hard.wav`,
+  clap: `${DIRT_BASE}/cp/HANDCLP0.wav`,
+  closedHat: `${DIRT_BASE}/hh/000_hh3closedhh.wav`,
+  openHat: `${DIRT_BASE}/808oh/OH00.WAV`,
+}
 
 export class DrumKit {
   private ctx: AudioContext | null = null
   private master!: GainNode
   private analyser!: AnalyserNode
   private reverbSend!: GainNode
+
+  private samples = new Map<DrumVoiceId, AudioBuffer>()
+  private loadPromise: Promise<number> | null = null
 
   private ensure(): AudioContext {
     if (this.ctx) return this.ctx
@@ -56,15 +75,49 @@ export class DrumKit {
     return this.ctx ? this.analyser : null
   }
 
-  play(id: DrumVoiceId) {
+  /**
+   * Fetch and decode the Dirt samples (once). Resolves with the number that
+   * loaded successfully; failed pads simply stay on their synth voice.
+   */
+  loadSamples(): Promise<number> {
+    if (this.loadPromise) return this.loadPromise
+    const ctx = this.ensure()
+    const entries = Object.entries(SAMPLE_URLS) as [DrumVoiceId, string][]
+    this.loadPromise = Promise.allSettled(
+      entries.map(async ([id, url]) => {
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`${res.status} ${url}`)
+        const buf = await ctx.decodeAudioData(await res.arrayBuffer())
+        this.samples.set(id, buf)
+      }),
+    ).then((results) => results.filter((r) => r.status === 'fulfilled').length)
+    return this.loadPromise
+  }
+
+  hasSample(id: DrumVoiceId): boolean {
+    return this.samples.has(id)
+  }
+
+  play(id: DrumVoiceId, useSample: boolean) {
     const ctx = this.ensure()
     if (ctx.state === 'suspended') void ctx.resume()
-    triggerDrum(id, ctx, this.master, ctx.currentTime)
-    triggerDrum(id, ctx, this.reverbSend, ctx.currentTime)
+    const buffer = this.samples.get(id)
+    if (useSample && buffer) {
+      const src = ctx.createBufferSource()
+      src.buffer = buffer
+      src.connect(this.master)
+      src.connect(this.reverbSend)
+      src.start(ctx.currentTime)
+    } else {
+      triggerDrum(id, ctx, this.master, ctx.currentTime)
+      triggerDrum(id, ctx, this.reverbSend, ctx.currentTime)
+    }
   }
 
   dispose() {
     this.ctx?.close()
     this.ctx = null
+    this.samples.clear()
+    this.loadPromise = null
   }
 }
