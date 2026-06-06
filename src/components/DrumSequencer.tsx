@@ -1,7 +1,7 @@
 import type { GrooveboxState } from '../audio/types'
 import { STEPS } from '../audio/types'
 import type { GrooveboxActions } from '../state/useGroovebox'
-import { DRUM_CATALOG, DRUM_CATEGORIES, SYNTH_OPTION } from '../audio/drumSamples'
+import { DRUM_CATALOG, DRUM_CATEGORIES, KITS, SYNTH_OPTION } from '../audio/drumSamples'
 
 interface Props {
   state: GrooveboxState
@@ -13,9 +13,28 @@ export function DrumSequencer({ state, actions }: Props) {
     <section className="panel drum-panel">
       <div className="panel-head">
         <h2>Drums</h2>
-        <button className="ghost-btn" onClick={actions.clearDrums}>
-          Clear
-        </button>
+        <div className="drum-head-actions">
+          <select
+            className="kit-select"
+            value=""
+            onChange={(e) => {
+              if (e.target.value) actions.setKit(e.target.value)
+            }}
+            aria-label="Load drum kit"
+          >
+            <option value="" disabled>
+              Load kit…
+            </option>
+            {KITS.map((k) => (
+              <option key={k.name} value={k.name}>
+                {k.name} kit
+              </option>
+            ))}
+          </select>
+          <button className="ghost-btn" onClick={actions.clearDrums}>
+            Clear
+          </button>
+        </div>
       </div>
 
       <div className="drum-grid">

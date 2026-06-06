@@ -5,7 +5,9 @@ import {
   DEFAULT_ASSIGNMENTS,
   DRUM_CATALOG,
   DRUM_CATEGORIES,
+  KITS,
   SYNTH_OPTION,
+  kitByName,
   soundById,
 } from '../audio/drumSamples'
 import { Scope } from '../components/Scope'
@@ -88,6 +90,19 @@ export function DrumPadsPage() {
     [kit],
   )
 
+  const applyKit = useCallback(
+    (name: string) => {
+      const k = kitByName(name)
+      if (!k) return
+      setAssignments((a) => ({ ...a, ...k.sounds }))
+      for (const id of Object.values(k.sounds)) {
+        const s = soundById(id)
+        if (s) void kit.loadSample(s.url)
+      }
+    },
+    [kit],
+  )
+
   // Computer-key triggers.
   useEffect(() => {
     const byKey = new Map(PADS.map((p) => [p.key, p.id]))
@@ -119,6 +134,27 @@ export function DrumPadsPage() {
             <span>DRUM PADS</span>
             <span>{status === 'loading' ? 'LOADING…' : 'CLASSIC KIT'}</span>
           </div>
+        </div>
+
+        <div className="op1-octave">
+          <span>Kit</span>
+          <select
+            className="kit-select"
+            value=""
+            onChange={(e) => {
+              if (e.target.value) applyKit(e.target.value)
+            }}
+            aria-label="Load drum kit"
+          >
+            <option value="" disabled>
+              Load kit…
+            </option>
+            {KITS.map((k) => (
+              <option key={k.name} value={k.name}>
+                {k.name} kit
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="pads">

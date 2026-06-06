@@ -994,3 +994,14 @@ select {
   color: var(--text);
   border-color: var(--accent-2);
 }
+
+/* ----- Kit selector ----- */
+.drum-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kit-select {
+  font-size: 11px;
+  padding: 4px 8px;
+}

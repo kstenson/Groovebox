@@ -8,7 +8,7 @@ import type {
   SynthTrack,
 } from '../audio/types'
 import { createInitialState } from './initialState'
-import { soundById } from '../audio/drumSamples'
+import { soundById, kitByName } from '../audio/drumSamples'
 
 /**
  * Owns the single AudioEngine instance and the React-side pattern state.
@@ -95,6 +95,22 @@ export function useGroovebox() {
     [engine],
   )
 
+  const setKit = useCallback(
+    (kitName: string) => {
+      const kit = kitByName(kitName)
+      if (!kit) return
+      for (const id of Object.values(kit.sounds)) {
+        const snd = soundById(id)
+        if (snd) void engine.loadSample(snd.url)
+      }
+      setState((s) => ({
+        ...s,
+        drums: s.drums.map((d) => ({ ...d, sound: kit.sounds[d.id] ?? d.sound })),
+      }))
+    },
+    [engine],
+  )
+
   const setDrumMixer = useCallback(
     (id: DrumVoiceId, patch: Partial<MixerSettings>) => {
       setState((s) => {
@@ -161,6 +177,7 @@ export function useGroovebox() {
       toggleDrumStep,
       setSynthStep,
       setDrumSound,
+      setKit,
       setDrumMixer,
       setSynthMixer,
       setSynthParam,
