@@ -454,3 +454,252 @@ select {
   padding: 6px 0 2px;
   line-height: 1.5;
 }
+
+/* ===================== Navigation ===================== */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+}
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-weight: 800;
+  letter-spacing: 3px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.nav-links {
+  display: flex;
+  gap: 8px;
+}
+.nav-link {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.nav-link:hover {
+  color: var(--text);
+}
+.nav-link.active {
+  color: var(--text);
+  border-color: var(--line);
+  background: var(--panel-2);
+}
+
+/* ===================== Home ===================== */
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px 8px;
+}
+.home-hero h1 {
+  font-size: 40px;
+  letter-spacing: 8px;
+  margin: 0 0 8px;
+}
+.home-hero p {
+  color: var(--muted);
+  margin: 0;
+  max-width: 520px;
+}
+.instrument-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+.instrument-card {
+  --card-accent: var(--accent-2);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  padding: 22px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: linear-gradient(160deg, var(--panel-2), var(--panel));
+  cursor: pointer;
+  transition: transform 0.1s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.instrument-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--card-accent);
+  box-shadow: 0 10px 30px -12px var(--card-accent);
+}
+.card-glyph {
+  font-size: 34px;
+  color: var(--card-accent);
+  line-height: 1;
+}
+.card-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+.card-tag {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ===================== OP-1 inspired synth ===================== */
+.op1 {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 20px;
+}
+.op1-body {
+  width: 100%;
+  max-width: 760px;
+  background: linear-gradient(180deg, #ececef, #d9d9de);
+  border: 1px solid #c2c2c8;
+  border-radius: 18px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.6), inset 0 1px 0 #fff;
+}
+.op1-screen {
+  position: relative;
+  background: #07070b;
+  border-radius: 10px;
+  border: 3px solid #1b1b22;
+  overflow: hidden;
+  aspect-ratio: 64 / 22;
+}
+.op1-screen canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.op1-screen-label {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #6df0c8;
+  pointer-events: none;
+  font-family: ui-monospace, monospace;
+}
+.op1-encoders {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  justify-items: center;
+  padding: 4px 0;
+}
+.op1-encoders .knob-label,
+.op1-encoders .knob-value {
+  color: #3a3a44;
+}
+.op1-encoders .knob-body {
+  fill: #fafafb;
+  stroke: #c2c2c8;
+}
+.op1-encoders .knob-pointer {
+  stroke: #2a2a30;
+}
+.op1-octave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: #3a3a44;
+  font-size: 13px;
+  font-weight: 600;
+}
+.op1-octave .ghost-btn {
+  color: #3a3a44;
+  border-color: #c2c2c8;
+}
+.op1-octave .ghost-btn:hover {
+  border-color: var(--accent);
+  color: #111;
+}
+.op1 .hint {
+  color: #5a5a66;
+}
+
+/* ----- Keyboard ----- */
+.keyboard {
+  position: relative;
+  height: 150px;
+  touch-action: none;
+  user-select: none;
+}
+.keys-white {
+  display: flex;
+  height: 100%;
+  gap: 3px;
+}
+.wkey {
+  flex: 1;
+  background: linear-gradient(180deg, #fff, #ececed);
+  border: 1px solid #bfbfc6;
+  border-radius: 0 0 7px 7px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding-bottom: 6px;
+  gap: 4px;
+  cursor: pointer;
+}
+.wkey.active {
+  background: linear-gradient(180deg, #ffd9c4, #ff9d6e);
+  border-color: var(--accent);
+}
+.keys-black {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60%;
+  pointer-events: none;
+}
+.bkey {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(180deg, #2a2a30, #0d0d12);
+  border: 1px solid #000;
+  border-radius: 0 0 5px 5px;
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 5px;
+}
+.bkey.active {
+  background: linear-gradient(180deg, #ff9d6e, #d85a23);
+}
+.key-name {
+  font-size: 9px;
+  color: #9a9aa3;
+}
+.key-hint {
+  font-size: 10px;
+  font-weight: 700;
+  color: #b06a3c;
+}
+.bkey .key-hint {
+  color: #ddd;
+}

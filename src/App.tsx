@@ -1,26 +1,30 @@
-import { useGroovebox } from './state/useGroovebox'
-import { Transport } from './components/Transport'
-import { DrumSequencer } from './components/DrumSequencer'
-import { SynthSequencer } from './components/SynthSequencer'
-import { Mixer } from './components/Mixer'
+import { useHashRoute } from './hooks/useHashRoute'
+import { NavBar } from './components/NavBar'
+import { HomePage } from './pages/HomePage'
+import { GrooveboxPage } from './pages/GrooveboxPage'
+import { SynthPage } from './pages/SynthPage'
 
 export default function App() {
-  const { state, actions } = useGroovebox()
+  const route = useHashRoute()
+
+  // Keying pages by route ensures each instrument fully mounts/unmounts when
+  // navigating, so its AudioContext is created on entry and torn down on exit.
+  let page
+  switch (route) {
+    case '/groovebox':
+      page = <GrooveboxPage key="groovebox" />
+      break
+    case '/op-1':
+      page = <SynthPage key="op-1" />
+      break
+    default:
+      page = <HomePage key="home" />
+  }
 
   return (
     <div className="app">
-      <Transport state={state} actions={actions} />
-      <main className="workspace">
-        <div className="sequencers">
-          <DrumSequencer state={state} actions={actions} />
-          <SynthSequencer state={state} actions={actions} />
-        </div>
-        <Mixer state={state} actions={actions} />
-      </main>
-      <footer className="hint">
-        Click steps to build a pattern · drag knobs vertically (hold Shift for fine) · click a
-        track name or note to audition · everything runs in your browser, nothing is sent anywhere.
-      </footer>
+      <NavBar current={route} />
+      {page}
     </div>
   )
 }

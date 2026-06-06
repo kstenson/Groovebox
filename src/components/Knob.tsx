@@ -9,13 +9,15 @@ interface KnobProps {
   format?: (v: number) => string
   onChange: (v: number) => void
   size?: number
+  /** Override the arc/indicator colour (used by the OP-1 coloured encoders). */
+  color?: string
 }
 
 const ANGLE_MIN = -135
 const ANGLE_MAX = 135
 
-/** A draggable rotary knob. Drag up/down to change; double-click logs value. */
-export function Knob({ label, value, min, max, format, onChange, size = 46 }: KnobProps) {
+/** A draggable rotary knob. Drag up/down to change; hold Shift for fine. */
+export function Knob({ label, value, min, max, format, onChange, size = 46, color }: KnobProps) {
   const dragRef = useRef<{ startY: number; startValue: number } | null>(null)
 
   const norm = (value - min) / (max - min)
@@ -76,6 +78,7 @@ export function Knob({ label, value, min, max, format, onChange, size = 46 }: Kn
           pathLength={100}
           strokeDasharray={`${norm * 75} 100`}
           transform="rotate(135 50 50)"
+          style={color ? { stroke: color } : undefined}
         />
         <line
           x1="50"
