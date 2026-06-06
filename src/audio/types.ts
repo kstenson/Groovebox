@@ -20,6 +20,8 @@ export interface DrumTrack {
   name: string
   steps: boolean[] // length STEPS
   mixer: MixerSettings
+  /** Catalog sound id to play, or 'synth' for the built-in synthesized voice. */
+  sound: string
 }
 
 export interface SynthTrack {

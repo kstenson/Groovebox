@@ -6,9 +6,10 @@
 // getState() callback, and mixer/effect parameter changes are pushed in
 // imperatively so they respond without waiting for the next step.
 
-import type { GrooveboxState, MixerSettings } from './types'
+import type { DrumTrack, GrooveboxState, MixerSettings } from './types'
 import { STEPS } from './types'
 import { triggerDrum, triggerSynth } from './voices'
+import { soundById } from './drumSamples'
 
 const LOOKAHEAD_MS = 25 // how often the scheduler wakes up
 const SCHEDULE_AHEAD = 0.1 // seconds of audio scheduled into the future
@@ -54,6 +55,10 @@ export class AudioEngine {
   private ctx: AudioContext | null = null
   private master!: GainNode
   private channels = new Map<string, Channel>()
+
+  // Loaded drum samples, keyed by URL.
+  private samples = new Map<string, AudioBuffer>()
+  private sampleLoading = new Map<string, Promise<boolean>>()
 
   // Effects buses
   private delayBus!: GainNode
@@ -209,7 +214,7 @@ export class AudioEngine {
     for (const track of state.drums) {
       if (track.steps[step]) {
         const ch = this.channels.get(track.id)
-        if (ch) triggerDrum(track.id, this.ctx!, ch.input, swung)
+        if (ch) this.playDrum(track, ch.input, swung)
       }
     }
 
@@ -257,7 +262,45 @@ export class AudioEngine {
     const ctx = this.ensureContext()
     if (ctx.state === 'suspended') void ctx.resume()
     const ch = this.channels.get(id)
-    if (ch) triggerDrum(id, ctx, ch.input, ctx.currentTime)
+    const track = this.getState().drums.find((d) => d.id === id)
+    if (ch && track) this.playDrum(track, ch.input, ctx.currentTime)
+  }
+
+  /** Play a drum track: its assigned sample if loaded, else the synth voice. */
+  private playDrum(track: DrumTrack, dest: AudioNode, time: number) {
+    const sound = track.sound && track.sound !== 'synth' ? soundById(track.sound) : undefined
+    const buffer = sound ? this.samples.get(sound.url) : undefined
+    if (buffer) {
+      const src = this.ctx!.createBufferSource()
+      src.buffer = buffer
+      src.connect(dest)
+      src.start(time)
+      return
+    }
+    triggerDrum(track.id, this.ctx!, dest, time)
+  }
+
+  /** Fetch + decode a drum sample (cached, idempotent). */
+  loadSample(url: string): Promise<boolean> {
+    if (this.samples.has(url)) return Promise.resolve(true)
+    const inflight = this.sampleLoading.get(url)
+    if (inflight) return inflight
+    const ctx = this.ensureContext()
+    const p = (async () => {
+      try {
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`${res.status}`)
+        const buf = await ctx.decodeAudioData(await res.arrayBuffer())
+        this.samples.set(url, buf)
+        return true
+      } catch {
+        return false
+      } finally {
+        this.sampleLoading.delete(url)
+      }
+    })()
+    this.sampleLoading.set(url, p)
+    return p
   }
 
   dispose() {
@@ -265,5 +308,7 @@ export class AudioEngine {
     this.ctx?.close()
     this.ctx = null
     this.channels.clear()
+    this.samples.clear()
+    this.sampleLoading.clear()
   }
 }

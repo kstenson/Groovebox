@@ -1,6 +1,7 @@
 import type { GrooveboxState } from '../audio/types'
 import { STEPS } from '../audio/types'
 import type { GrooveboxActions } from '../state/useGroovebox'
+import { DRUM_CATALOG, DRUM_CATEGORIES, SYNTH_OPTION } from '../audio/drumSamples'
 
 interface Props {
   state: GrooveboxState
@@ -20,13 +21,32 @@ export function DrumSequencer({ state, actions }: Props) {
       <div className="drum-grid">
         {state.drums.map((track) => (
           <div className="drum-row" key={track.id}>
-            <button
-              className="track-name"
-              onClick={() => actions.previewDrum(track.id)}
-              title="Click to audition"
-            >
-              {track.name}
-            </button>
+            <div className="track-head">
+              <button
+                className="track-name"
+                onClick={() => actions.previewDrum(track.id)}
+                title="Click to audition"
+              >
+                {track.name}
+              </button>
+              <select
+                className="track-sound"
+                value={track.sound}
+                onChange={(e) => actions.setDrumSound(track.id, e.target.value)}
+                aria-label={`${track.name} sound`}
+              >
+                <option value={SYNTH_OPTION}>Synth</option>
+                {DRUM_CATEGORIES.map((cat) => (
+                  <optgroup key={cat} label={cat}>
+                    {DRUM_CATALOG.filter((s) => s.category === cat).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
             <div className="steps">
               {track.steps.map((on, i) => (
                 <button

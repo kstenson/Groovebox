@@ -967,3 +967,30 @@ select {
   border: 1px solid #c2c2c8;
   border-radius: 6px;
 }
+
+/* ----- Groovebox drum track sound picker ----- */
+.drum-row {
+  grid-template-columns: 116px 1fr;
+}
+.track-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.track-head .track-name {
+  width: 100%;
+}
+.track-sound {
+  width: 100%;
+  font-size: 10px;
+  padding: 3px 4px;
+  background: var(--panel-2);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+.track-sound:hover {
+  color: var(--text);
+  border-color: var(--accent-2);
+}

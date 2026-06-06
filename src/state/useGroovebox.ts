@@ -8,6 +8,7 @@ import type {
   SynthTrack,
 } from '../audio/types'
 import { createInitialState } from './initialState'
+import { soundById } from '../audio/drumSamples'
 
 /**
  * Owns the single AudioEngine instance and the React-side pattern state.
@@ -30,6 +31,14 @@ export function useGroovebox() {
   const engine = engineRef.current
 
   useEffect(() => () => engine.dispose(), [engine])
+
+  // Preload the drum tracks' default samples (falls back to synth until ready).
+  useEffect(() => {
+    for (const d of stateRef.current.drums) {
+      const snd = soundById(d.sound)
+      if (snd) void engine.loadSample(snd.url)
+    }
+  }, [engine])
 
   const togglePlay = useCallback(() => {
     setState((s) => {
@@ -73,6 +82,18 @@ export function useGroovebox() {
       synth: { ...s.synth, steps: s.synth.steps.map((n, i) => (i === step ? note : n)) },
     }))
   }, [])
+
+  const setDrumSound = useCallback(
+    (id: DrumVoiceId, soundId: string) => {
+      const snd = soundById(soundId)
+      if (snd) void engine.loadSample(snd.url)
+      setState((s) => ({
+        ...s,
+        drums: s.drums.map((d) => (d.id === id ? { ...d, sound: soundId } : d)),
+      }))
+    },
+    [engine],
+  )
 
   const setDrumMixer = useCallback(
     (id: DrumVoiceId, patch: Partial<MixerSettings>) => {
@@ -139,6 +160,7 @@ export function useGroovebox() {
       setMasterVolume,
       toggleDrumStep,
       setSynthStep,
+      setDrumSound,
       setDrumMixer,
       setSynthMixer,
       setSynthParam,

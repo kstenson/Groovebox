@@ -1,5 +1,6 @@
 import type { DrumTrack, GrooveboxState, MixerSettings } from '../audio/types'
 import { STEPS } from '../audio/types'
+import { DEFAULT_ASSIGNMENTS } from '../audio/drumSamples'
 
 const defaultMixer = (overrides: Partial<MixerSettings> = {}): MixerSettings => ({
   volume: 0.8,
@@ -13,7 +14,14 @@ const defaultMixer = (overrides: Partial<MixerSettings> = {}): MixerSettings => 
 const emptyDrumSteps = () => Array<boolean>(STEPS).fill(false)
 
 function drumTrack(id: DrumTrack['id'], name: string, mixer?: Partial<MixerSettings>): DrumTrack {
-  return { id, name, steps: emptyDrumSteps(), mixer: defaultMixer(mixer) }
+  return {
+    id,
+    name,
+    steps: emptyDrumSteps(),
+    mixer: defaultMixer(mixer),
+    // Default to the matching classic sample; falls back to synth until loaded.
+    sound: DEFAULT_ASSIGNMENTS[id],
+  }
 }
 
 export function createInitialState(): GrooveboxState {
