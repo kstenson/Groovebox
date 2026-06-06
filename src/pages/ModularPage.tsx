@@ -65,14 +65,14 @@ export function ModularPage() {
     lfo1: 'sine',
   })
 
-  // ---- One-time engine setup mirroring the initial state ----
-  const setupDone = useRef(false)
+  // ---- Engine setup mirroring the initial state ----
+  // Setup and teardown are symmetric: each mount builds the modules/cables and
+  // each unmount disposes them. (A persistent "already set up" guard must NOT
+  // be used here — under StrictMode the mount/cleanup/mount cycle would dispose
+  // the engine and then skip the rebuild, leaving it silent.)
   useEffect(() => {
-    if (!setupDone.current) {
-      setupDone.current = true
-      for (const m of INITIAL_MODULES) engine.addModule(m.id, m.type)
-      for (const c of INITIAL_CABLES) engine.connect(c.from, c.to)
-    }
+    for (const m of INITIAL_MODULES) engine.addModule(m.id, m.type)
+    for (const c of INITIAL_CABLES) engine.connect(c.from, c.to)
     return () => engine.dispose()
   }, [engine])
 

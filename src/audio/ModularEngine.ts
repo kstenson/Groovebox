@@ -231,5 +231,6 @@ export class ModularEngine {
     for (const id of [...this.modules.keys()]) this.removeModule(id)
     this.ctx?.close()
     this.ctx = null
+    this.noiseBuffer = null
   }
 }
