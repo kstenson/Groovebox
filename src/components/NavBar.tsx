@@ -11,6 +11,7 @@ const NAV: NavItem[] = [
   { path: '/op-1', label: 'Cluster Synth' },
   { path: '/fm', label: 'FM Synth' },
   { path: '/pads', label: 'Drum Pads' },
+  { path: '/modular', label: 'Modular' },
 ]
 
 export function NavBar({ current }: { current: string }) {

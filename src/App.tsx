@@ -5,6 +5,7 @@ import { GrooveboxPage } from './pages/GrooveboxPage'
 import { SynthPage } from './pages/SynthPage'
 import { FMSynthPage } from './pages/FMSynthPage'
 import { DrumPadsPage } from './pages/DrumPadsPage'
+import { ModularPage } from './pages/ModularPage'
 
 export default function App() {
   const route = useHashRoute()
@@ -24,6 +25,9 @@ export default function App() {
       break
     case '/pads':
       page = <DrumPadsPage key="pads" />
+      break
+    case '/modular':
+      page = <ModularPage key="modular" />
       break
     default:
       page = <HomePage key="home" />

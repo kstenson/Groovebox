@@ -38,6 +38,13 @@ const INSTRUMENTS: Instrument[] = [
     accent: '#ffd23d',
     glyph: '⊞',
   },
+  {
+    path: '/modular',
+    name: 'Modular',
+    tagline: 'Patchable Eurorack-style rack · drag virtual cables',
+    accent: '#9b6cff',
+    glyph: '⧉',
+  },
 ]
 
 export function HomePage() {

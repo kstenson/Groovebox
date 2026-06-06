@@ -751,3 +751,152 @@ select {
   color: #4a4a55;
   letter-spacing: 1px;
 }
+
+/* ===================== Modular synth ===================== */
+.modular {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.modular-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+}
+.add-palette {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rack {
+  position: relative;
+  background: repeating-linear-gradient(
+      180deg,
+      #14141d 0px,
+      #14141d 2px,
+      #11111a 2px,
+      #11111a 4px
+    );
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  min-height: 420px;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.cable-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+.cable {
+  fill: none;
+  stroke: #ff7a3d;
+  stroke-width: 4;
+  stroke-linecap: round;
+  pointer-events: stroke;
+  cursor: pointer;
+  opacity: 0.85;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+}
+.cable:hover {
+  stroke: #fff;
+}
+.cable.pending {
+  stroke: #ffd23d;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.module {
+  position: relative;
+  width: 150px;
+  background: linear-gradient(180deg, #232333, #1b1b27);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1;
+}
+.module-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+.mod-remove {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+}
+.mod-remove:hover {
+  color: var(--accent);
+}
+.module-knobs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.module .wave-buttons {
+  justify-content: center;
+}
+
+.jacks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-around;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  margin-top: 2px;
+}
+.jack-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.jack {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #2a2a38, #07070b 70%);
+  border: 2px solid #ff7a3d;
+  cursor: crosshair;
+  box-shadow: inset 0 0 4px #000;
+  transition: transform 0.05s ease;
+}
+.jack:hover {
+  transform: scale(1.15);
+}
+.jack.dragging {
+  box-shadow: 0 0 10px 2px currentColor;
+}
+.jack-label {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
