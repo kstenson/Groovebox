@@ -16,6 +16,7 @@ export type ModuleType =
   | 'delay'
   | 'drive'
   | 'atten'
+  | 'seq'
 
 export type JackKind = 'audioOut' | 'cvOut' | 'audioIn' | 'cvIn' | 'gateOut' | 'gateIn'
 
@@ -68,7 +69,7 @@ export const MODULE_DEFS: Record<ModuleType, ModuleDef> = {
       { id: 'pitch', label: 'PITCH', kind: 'cvIn' },
       { id: 'out', label: 'OUT', kind: 'audioOut' },
     ],
-    params: [{ id: 'freq', label: 'FREQ', min: 20, max: 2000, default: 110, unit: 'Hz' }],
+    params: [{ id: 'freq', label: 'FREQ', min: 0, max: 2000, default: 110, unit: 'Hz' }],
   },
   lfo: {
     type: 'lfo',
@@ -215,6 +216,19 @@ export const MODULE_DEFS: Record<ModuleType, ModuleDef> = {
       { id: 'out', label: 'OUT', kind: 'audioOut' },
     ],
     params: [{ id: 'amount', label: 'AMOUNT', min: -1, max: 1, default: 1 }],
+  },
+  seq: {
+    type: 'seq',
+    name: 'SEQ',
+    accent: '#ffd23d',
+    removable: true,
+    // The step grid is a custom UI; these jacks are the only patch points.
+    jacks: [
+      { id: 'clock', label: 'CLOCK', kind: 'gateIn' },
+      { id: 'pitch', label: 'PITCH', kind: 'cvOut' },
+      { id: 'gate', label: 'GATE', kind: 'gateOut' },
+    ],
+    params: [],
   },
 }
 

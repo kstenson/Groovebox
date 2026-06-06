@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ModularEngine } from '../audio/ModularEngine'
 import { Knob } from '../components/Knob'
+import { buildScale, midiToFreq } from '../theory'
 import {
   MODULE_DEFS,
   isOutputJack,
@@ -12,6 +13,22 @@ import {
   type ModuleInstance,
   type ModuleType,
 } from '../modular/defs'
+
+// Sequencer pitch pool: C minor pentatonic across two octaves (C3 up).
+const SEQ_NOTES = buildScale(48, 'minorPentatonic', 2)
+const SEQ_LEN = 8
+const DEFAULT_SEQ_DEGREES = [0, 2, 1, 3, 0, 4, 2, 5]
+const seqFreq = (degree: number) =>
+  midiToFreq(SEQ_NOTES[Math.max(0, Math.min(SEQ_NOTES.length - 1, degree))])
+
+interface SeqPattern {
+  degrees: number[]
+  ons: boolean[]
+}
+const defaultSeqPattern = (): SeqPattern => ({
+  degrees: DEFAULT_SEQ_DEGREES.slice(0, SEQ_LEN),
+  ons: Array<boolean>(SEQ_LEN).fill(true),
+})
 
 const WAVEFORMS: OscillatorType[] = ['sawtooth', 'square', 'triangle', 'sine']
 const WAVE_GLYPH: Record<OscillatorType, string> = {
@@ -68,6 +85,16 @@ export function ModularPage() {
     vco1: 'sawtooth',
     lfo1: 'sine',
   })
+  const [seqState, setSeqState] = useState<Record<string, SeqPattern>>({})
+  const [currentStep, setCurrentStep] = useState<Record<string, number>>({})
+
+  // Sequencers report their advancing step for the playhead highlight.
+  useEffect(() => {
+    engine.onSeqStep = (id, step) => setCurrentStep((s) => ({ ...s, [id]: step }))
+    return () => {
+      engine.onSeqStep = null
+    }
+  }, [engine])
 
   // ---- Engine setup mirroring the initial state ----
   // Setup and teardown are symmetric: each mount builds the modules/cables and
@@ -201,6 +228,26 @@ export function ModularPage() {
     setWaves((s) => ({ ...s, [moduleId]: w }))
   }
 
+  const toggleSeqStep = (id: string, i: number) => {
+    setSeqState((s) => {
+      const pat = s[id]
+      if (!pat) return s
+      const ons = pat.ons.map((v, idx) => (idx === i ? !v : v))
+      engine.setSeqStep(id, i, ons[i], seqFreq(pat.degrees[i]))
+      return { ...s, [id]: { ...pat, ons } }
+    })
+  }
+
+  const setSeqDegree = (id: string, i: number, degree: number) => {
+    setSeqState((s) => {
+      const pat = s[id]
+      if (!pat) return s
+      const degrees = pat.degrees.map((v, idx) => (idx === i ? degree : v))
+      engine.setSeqStep(id, i, pat.ons[i], seqFreq(degree))
+      return { ...s, [id]: { ...pat, degrees } }
+    })
+  }
+
   const addCount = useRef(0)
   const addModule = (type: ModuleType) => {
     const id = `${type}-${++addCount.current}-${Date.now().toString(36)}`
@@ -208,6 +255,12 @@ export function ModularPage() {
     setParams((p) => ({ ...p, [id]: defaultParams(type) }))
     if (type === 'vco' || type === 'lfo') {
       setWaves((s) => ({ ...s, [id]: type === 'vco' ? 'sawtooth' : 'sine' }))
+    }
+    if (type === 'seq') {
+      const pat = defaultSeqPattern()
+      pat.degrees.forEach((deg, i) => engine.setSeqStep(id, i, pat.ons[i], seqFreq(deg)))
+      setSeqState((s) => ({ ...s, [id]: pat }))
+      setCurrentStep((s) => ({ ...s, [id]: -1 }))
     }
     setModules((m) => [...m.slice(0, -1), { id, type }, m[m.length - 1]]) // keep Output last
     setLayoutVersion((v) => v + 1)
@@ -263,6 +316,7 @@ export function ModularPage() {
               'clock',
               'env',
               'snh',
+              'seq',
               'mix',
               'delay',
               'drive',
@@ -299,7 +353,11 @@ export function ModularPage() {
         {modules.map((m) => {
           const def = MODULE_DEFS[m.type]
           return (
-            <div className="module" key={m.id} style={{ borderTopColor: def.accent }}>
+            <div
+              className={`module ${m.type === 'seq' ? 'seq' : ''}`}
+              key={m.id}
+              style={{ borderTopColor: def.accent }}
+            >
               <div className="module-head" style={{ color: def.accent }}>
                 <span>{def.name}</span>
                 {def.removable && (
@@ -309,21 +367,50 @@ export function ModularPage() {
                 )}
               </div>
 
-              <div className="module-knobs">
-                {def.params.map((p) => (
-                  <Knob
-                    key={p.id}
-                    label={p.label}
-                    color={def.accent}
-                    value={params[m.id]?.[p.id] ?? p.default}
-                    min={p.min}
-                    max={p.max}
-                    size={42}
-                    format={(v) => (p.unit === 'Hz' ? `${Math.round(v)}` : v.toFixed(2))}
-                    onChange={(v) => onParam(m.id, p.id, v)}
-                  />
-                ))}
-              </div>
+              {m.type === 'seq' ? (
+                <div className="seq-grid">
+                  {(seqState[m.id]?.degrees ?? []).map((degree, i) => {
+                    const on = seqState[m.id]?.ons[i] ?? true
+                    return (
+                      <div
+                        className={`seq-step ${currentStep[m.id] === i ? 'playing' : ''}`}
+                        key={i}
+                      >
+                        <input
+                          className="seq-pitch"
+                          type="range"
+                          min={0}
+                          max={SEQ_NOTES.length - 1}
+                          value={degree}
+                          onChange={(e) => setSeqDegree(m.id, i, Number(e.target.value))}
+                          aria-label={`Step ${i + 1} pitch`}
+                        />
+                        <button
+                          className={`seq-toggle ${on ? 'on' : ''}`}
+                          onClick={() => toggleSeqStep(m.id, i)}
+                          aria-label={`Step ${i + 1} ${on ? 'on' : 'off'}`}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="module-knobs">
+                  {def.params.map((p) => (
+                    <Knob
+                      key={p.id}
+                      label={p.label}
+                      color={def.accent}
+                      value={params[m.id]?.[p.id] ?? p.default}
+                      min={p.min}
+                      max={p.max}
+                      size={42}
+                      format={(v) => (p.unit === 'Hz' ? `${Math.round(v)}` : v.toFixed(2))}
+                      onChange={(v) => onParam(m.id, p.id, v)}
+                    />
+                  ))}
+                </div>
+              )}
 
               {def.waveform && (
                 <div className="wave-buttons">
@@ -366,9 +453,9 @@ export function ModularPage() {
 
       <p className="hint">
         Drag a cable from one jack to another to patch (orange = audio, teal = CV, yellow = gate) ·
-        click a cable to remove it · for a rhythmic patch: add a CLOCK + ENV, patch CLOCK gate → ENV
-        gate and ENV out → a VCA's GAIN CV (turn the VCA gain down first). Add an S&H into a VCO's
-        PITCH for random melodies. Hit <strong>Enable Audio</strong> to hear it.
+        click a cable to remove it · melodic patch: CLOCK gate → SEQ clock, SEQ pitch → VCO PITCH
+        (turn the VCO FREQ to 0), SEQ gate → ENV gate, ENV out → VCA GAIN CV. Drag a step's slider to
+        set its note, click the dot to mute it. Hit <strong>Enable Audio</strong> to hear it.
       </p>
     </div>
   )

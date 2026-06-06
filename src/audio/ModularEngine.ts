@@ -17,6 +17,8 @@ interface EngineModule {
   setWaveform?: (w: OscillatorType) => void
   /** Called when a gate/trigger arrives at one of the module's gate inputs. */
   onGate?: (jack: string, time: number, value: number) => void
+  /** Sequencer step edit: set a step's on-state and pitch (Hz). */
+  setStep?: (index: number, on: boolean, freq: number) => void
   stop: () => void
 }
 
@@ -26,6 +28,8 @@ export class ModularEngine {
   private noiseBuffer: AudioBuffer | null = null
   /** Logical gate/trigger wiring: source jack key -> target jack refs. */
   private gateTargets = new Map<string, JackRef[]>()
+  /** UI notification when a sequencer advances to a new step. */
+  onSeqStep: ((moduleId: string, step: number) => void) | null = null
 
   private ensure(): AudioContext {
     if (!this.ctx) this.ctx = new AudioContext()
@@ -59,7 +63,12 @@ export class ModularEngine {
     const ctx = this.ensure()
     if (this.modules.has(id)) return
     const emit = (jack: string, time: number, value = 1) => this.fireGate(id, jack, time, value)
-    this.modules.set(id, this.createModule(ctx, type, emit))
+    const notifyStep = (step: number) => this.onSeqStep?.(id, step)
+    this.modules.set(id, this.createModule(ctx, type, emit, notifyStep))
+  }
+
+  setSeqStep(id: string, index: number, on: boolean, freq: number) {
+    this.modules.get(id)?.setStep?.(index, on, freq)
   }
 
   /** Route a gate pulse from a source jack to every connected gate input. */
@@ -140,6 +149,7 @@ export class ModularEngine {
     ctx: AudioContext,
     type: ModuleType,
     emit: (jack: string, time: number, value?: number) => void,
+    notifyStep: (step: number) => void,
   ): EngineModule {
     const outputs = new Map<string, AudioNode>()
     const audioInputs = new Map<string, AudioNode>()
@@ -447,6 +457,42 @@ export class ModularEngine {
             if (id === 'amount') g.gain.setTargetAtTime(v, set(), 0.01)
           },
           stop: () => {},
+        }
+      }
+      case 'seq': {
+        // Step sequencer: each clock pulse advances one step, latching that
+        // step's pitch onto the CV output and firing the gate if it's active.
+        const cv = ctx.createConstantSource()
+        cv.offset.value = 110
+        cv.start()
+        outputs.set('pitch', cv)
+        const len = 8
+        const steps = Array.from({ length: len }, () => ({ on: true, freq: 110 }))
+        let cur = -1
+        return {
+          type,
+          outputs,
+          audioInputs,
+          cvInputs,
+          setParam: () => {},
+          setStep: (i, on, freq) => {
+            if (steps[i]) {
+              steps[i].on = on
+              steps[i].freq = freq
+            }
+          },
+          onGate: (_jack, time) => {
+            cur = (cur + 1) % len
+            const step = cur
+            const s = steps[step]
+            const t = Math.max(time, ctx.currentTime)
+            cv.offset.setValueAtTime(s.freq, t)
+            if (s.on) emit('gate', t, 1)
+            // Move the UI playhead at the moment the step actually sounds,
+            // rather than when it was scheduled (up to a look-ahead early).
+            window.setTimeout(() => notifyStep(step), Math.max(0, (t - ctx.currentTime) * 1000))
+          },
+          stop: () => cv.stop(),
         }
       }
     }
