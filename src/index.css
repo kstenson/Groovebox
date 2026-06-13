@@ -1005,3 +1005,25 @@ select {
   font-size: 11px;
   padding: 4px 8px;
 }
+
+/* ----- Modular patch presets + sampler ----- */
+.patch-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.patch-picker select {
+  font-size: 12px;
+  min-width: 160px;
+}
+.patch-blurb {
+  margin: -4px 2px 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+.sampler-select {
+  width: 100%;
+  font-size: 10px;
+  padding: 3px 4px;
+}

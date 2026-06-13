@@ -19,6 +19,8 @@ interface EngineModule {
   onGate?: (jack: string, time: number, value: number) => void
   /** Sequencer step edit: set a step's on-state and pitch (Hz). */
   setStep?: (index: number, on: boolean, freq: number) => void
+  /** Sampler: choose which sample URL the module plays. */
+  setSampleUrl?: (url: string) => void
   stop: () => void
 }
 
@@ -26,6 +28,9 @@ export class ModularEngine {
   private ctx: AudioContext | null = null
   private modules = new Map<string, EngineModule>()
   private noiseBuffer: AudioBuffer | null = null
+  /** Decoded sampler buffers, keyed by URL. */
+  private samples = new Map<string, AudioBuffer>()
+  private sampleLoading = new Map<string, Promise<boolean>>()
   /** Logical gate/trigger wiring: source jack key -> target jack refs. */
   private gateTargets = new Map<string, JackRef[]>()
   /** UI notification when a sequencer advances to a new step. */
@@ -69,6 +74,40 @@ export class ModularEngine {
 
   setSeqStep(id: string, index: number, on: boolean, freq: number) {
     this.modules.get(id)?.setStep?.(index, on, freq)
+  }
+
+  setSampleUrl(id: string, url: string) {
+    this.modules.get(id)?.setSampleUrl?.(url)
+    void this.loadSample(url)
+  }
+
+  /** Fetch + decode a sampler sample (cached, idempotent). */
+  loadSample(url: string): Promise<boolean> {
+    if (this.samples.has(url)) return Promise.resolve(true)
+    const inflight = this.sampleLoading.get(url)
+    if (inflight) return inflight
+    const ctx = this.ensure()
+    const p = (async () => {
+      try {
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`${res.status}`)
+        const buf = await ctx.decodeAudioData(await res.arrayBuffer())
+        this.samples.set(url, buf)
+        return true
+      } catch {
+        return false
+      } finally {
+        this.sampleLoading.delete(url)
+      }
+    })()
+    this.sampleLoading.set(url, p)
+    return p
+  }
+
+  /** Remove every module and cable, keeping the context and sample cache. */
+  clearAll() {
+    for (const id of [...this.modules.keys()]) this.removeModule(id)
+    this.gateTargets.clear()
   }
 
   /** Route a gate pulse from a source jack to every connected gate input. */
@@ -495,6 +534,37 @@ export class ModularEngine {
           stop: () => cv.stop(),
         }
       }
+      case 'sampler': {
+        // One-shot sample player: each trigger fires the chosen sample.
+        const out = ctx.createGain()
+        out.gain.value = 0.9
+        outputs.set('out', out)
+        let url = ''
+        let speed = 1
+        return {
+          type,
+          outputs,
+          audioInputs,
+          cvInputs,
+          setParam: (id, v) => {
+            if (id === 'gain') out.gain.setTargetAtTime(v, set(), 0.01)
+            if (id === 'speed') speed = v
+          },
+          setSampleUrl: (u) => {
+            url = u
+          },
+          onGate: (_jack, time) => {
+            const buffer = this.samples.get(url)
+            if (!buffer) return
+            const src = ctx.createBufferSource()
+            src.buffer = buffer
+            src.playbackRate.value = speed
+            src.connect(out)
+            src.start(Math.max(time, ctx.currentTime))
+          },
+          stop: () => {},
+        }
+      }
     }
   }
 
@@ -504,5 +574,7 @@ export class ModularEngine {
     this.ctx?.close()
     this.ctx = null
     this.noiseBuffer = null
+    this.samples.clear()
+    this.sampleLoading.clear()
   }
 }

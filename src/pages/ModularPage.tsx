@@ -3,6 +3,12 @@ import { ModularEngine } from '../audio/ModularEngine'
 import { Knob } from '../components/Knob'
 import { buildScale, midiToFreq } from '../theory'
 import {
+  DRUM_CATALOG,
+  DRUM_CATEGORIES,
+  soundById,
+} from '../audio/drumSamples'
+import { PATCHES, type Patch } from '../modular/presets'
+import {
   MODULE_DEFS,
   isOutputJack,
   jackGroup,
@@ -39,21 +45,6 @@ const WAVE_GLYPH: Record<OscillatorType, string> = {
   custom: '∿',
 }
 
-const INITIAL_MODULES: ModuleInstance[] = [
-  { id: 'vco1', type: 'vco' },
-  { id: 'vcf1', type: 'vcf' },
-  { id: 'vca1', type: 'vca' },
-  { id: 'lfo1', type: 'lfo' },
-  { id: 'out1', type: 'output' },
-]
-
-const INITIAL_CABLES: Cable[] = [
-  { id: 'c1', from: { moduleId: 'vco1', jack: 'out' }, to: { moduleId: 'vcf1', jack: 'in' } },
-  { id: 'c2', from: { moduleId: 'vcf1', jack: 'out' }, to: { moduleId: 'vca1', jack: 'in' } },
-  { id: 'c3', from: { moduleId: 'vca1', jack: 'out' }, to: { moduleId: 'out1', jack: 'in' } },
-  { id: 'c4', from: { moduleId: 'lfo1', jack: 'out' }, to: { moduleId: 'vcf1', jack: 'cv' } },
-]
-
 const defaultParams = (type: ModuleType): Record<string, number> => {
   const out: Record<string, number> = {}
   for (const p of MODULE_DEFS[type].params) out[p.id] = p.default
@@ -73,20 +64,15 @@ export function ModularPage() {
   if (engineRef.current === null) engineRef.current = new ModularEngine()
   const engine = engineRef.current
 
-  const [modules, setModules] = useState<ModuleInstance[]>(INITIAL_MODULES)
-  const [cables, setCables] = useState<Cable[]>(INITIAL_CABLES)
+  const [modules, setModules] = useState<ModuleInstance[]>([])
+  const [cables, setCables] = useState<Cable[]>([])
   const [running, setRunning] = useState(false)
-  const [params, setParams] = useState<Record<string, Record<string, number>>>(() => {
-    const out: Record<string, Record<string, number>> = {}
-    for (const m of INITIAL_MODULES) out[m.id] = defaultParams(m.type)
-    return out
-  })
-  const [waves, setWaves] = useState<Record<string, OscillatorType>>({
-    vco1: 'sawtooth',
-    lfo1: 'sine',
-  })
+  const [params, setParams] = useState<Record<string, Record<string, number>>>({})
+  const [waves, setWaves] = useState<Record<string, OscillatorType>>({})
   const [seqState, setSeqState] = useState<Record<string, SeqPattern>>({})
+  const [samplerSound, setSamplerSoundState] = useState<Record<string, string>>({})
   const [currentStep, setCurrentStep] = useState<Record<string, number>>({})
+  const [activePatch, setActivePatch] = useState<string>(PATCHES[0].name)
 
   // Sequencers report their advancing step for the playhead highlight.
   useEffect(() => {
@@ -96,16 +82,62 @@ export function ModularPage() {
     }
   }, [engine])
 
-  // ---- Engine setup mirroring the initial state ----
-  // Setup and teardown are symmetric: each mount builds the modules/cables and
-  // each unmount disposes them. (A persistent "already set up" guard must NOT
-  // be used here — under StrictMode the mount/cleanup/mount cycle would dispose
-  // the engine and then skip the rebuild, leaving it silent.)
+  // Rebuild the whole rack (engine + UI state) from a patch description.
+  const applyPatch = useCallback(
+    (patch: Patch) => {
+      engine.clearAll()
+      const nextParams: Record<string, Record<string, number>> = {}
+      const nextWaves: Record<string, OscillatorType> = {}
+      const nextSeq: Record<string, SeqPattern> = {}
+      const nextSampler: Record<string, string> = {}
+      const nextStep: Record<string, number> = {}
+
+      for (const pm of patch.modules) {
+        engine.addModule(pm.id, pm.type)
+        const p = { ...defaultParams(pm.type), ...(pm.params ?? {}) }
+        nextParams[pm.id] = p
+        for (const [k, v] of Object.entries(p)) engine.setParam(pm.id, k, v)
+        if (pm.type === 'vco' || pm.type === 'lfo') {
+          const w = pm.wave ?? (pm.type === 'vco' ? 'sawtooth' : 'sine')
+          nextWaves[pm.id] = w
+          engine.setWaveform(pm.id, w)
+        }
+        if (pm.type === 'seq') {
+          const pat = pm.seq ?? defaultSeqPattern()
+          nextSeq[pm.id] = pat
+          pat.degrees.forEach((d, i) => engine.setSeqStep(pm.id, i, pat.ons[i], seqFreq(d)))
+          nextStep[pm.id] = -1
+        }
+        if (pm.type === 'sampler') {
+          const sid = pm.sampler ?? 'k_808'
+          nextSampler[pm.id] = sid
+          const snd = soundById(sid)
+          if (snd) engine.setSampleUrl(pm.id, snd.url)
+        }
+      }
+      for (const cb of patch.cables) engine.connect(cb.from, cb.to)
+
+      setModules(patch.modules.map((m) => ({ id: m.id, type: m.type })))
+      setCables(patch.cables.map((cb, i) => ({ id: `c${i}`, from: cb.from, to: cb.to })))
+      setParams(nextParams)
+      setWaves(nextWaves)
+      setSeqState(nextSeq)
+      setSamplerSoundState(nextSampler)
+      setCurrentStep(nextStep)
+      setActivePatch(patch.name)
+    },
+    [engine],
+  )
+
+  // ---- Engine setup ----
+  // Setup and teardown are symmetric: each mount loads the default patch and
+  // each unmount disposes the engine. (No persistent "already set up" guard —
+  // under StrictMode the mount/cleanup/mount cycle would dispose then skip the
+  // rebuild, leaving the rack silent.)
   useEffect(() => {
-    for (const m of INITIAL_MODULES) engine.addModule(m.id, m.type)
-    for (const c of INITIAL_CABLES) engine.connect(c.from, c.to)
+    applyPatch(PATCHES[0])
     return () => engine.dispose()
-  }, [engine])
+  }, [engine, applyPatch])
 
   // ---- Jack position measurement ----
   const rackRef = useRef<HTMLDivElement | null>(null)
@@ -248,6 +280,12 @@ export function ModularPage() {
     })
   }
 
+  const setSamplerSound = (id: string, soundId: string) => {
+    const snd = soundById(soundId)
+    if (snd) engine.setSampleUrl(id, snd.url)
+    setSamplerSoundState((s) => ({ ...s, [id]: soundId }))
+  }
+
   const addCount = useRef(0)
   const addModule = (type: ModuleType) => {
     const id = `${type}-${++addCount.current}-${Date.now().toString(36)}`
@@ -261,6 +299,12 @@ export function ModularPage() {
       pat.degrees.forEach((deg, i) => engine.setSeqStep(id, i, pat.ons[i], seqFreq(deg)))
       setSeqState((s) => ({ ...s, [id]: pat }))
       setCurrentStep((s) => ({ ...s, [id]: -1 }))
+    }
+    if (type === 'sampler') {
+      const sid = 'k_808'
+      const snd = soundById(sid)
+      if (snd) engine.setSampleUrl(id, snd.url)
+      setSamplerSoundState((s) => ({ ...s, [id]: sid }))
     }
     setModules((m) => [...m.slice(0, -1), { id, type }, m[m.length - 1]]) // keep Output last
     setLayoutVersion((v) => v + 1)
@@ -304,6 +348,23 @@ export function ModularPage() {
         <button className={`play-btn ${running ? 'playing' : ''}`} onClick={togglePower}>
           {running ? '◉ Audio On' : '▷ Enable Audio'}
         </button>
+        <div className="patch-picker">
+          <span className="ctrl-label">PATCH</span>
+          <select
+            value={activePatch}
+            onChange={(e) => {
+              const patch = PATCHES.find((p) => p.name === e.target.value)
+              if (patch) applyPatch(patch)
+            }}
+            aria-label="Load a patch"
+          >
+            {PATCHES.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="add-palette">
           <span className="ctrl-label">ADD</span>
           {(
@@ -317,6 +378,7 @@ export function ModularPage() {
               'env',
               'snh',
               'seq',
+              'sampler',
               'mix',
               'delay',
               'drive',
@@ -329,6 +391,10 @@ export function ModularPage() {
           ))}
         </div>
       </div>
+
+      <p className="patch-blurb">
+        {PATCHES.find((p) => p.name === activePatch)?.blurb}
+      </p>
 
       <div className="rack" ref={rackRef} onPointerMove={onRackMove} onPointerUp={onRackUp}>
         <svg className="cable-layer">
@@ -395,21 +461,41 @@ export function ModularPage() {
                   })}
                 </div>
               ) : (
-                <div className="module-knobs">
-                  {def.params.map((p) => (
-                    <Knob
-                      key={p.id}
-                      label={p.label}
-                      color={def.accent}
-                      value={params[m.id]?.[p.id] ?? p.default}
-                      min={p.min}
-                      max={p.max}
-                      size={42}
-                      format={(v) => (p.unit === 'Hz' ? `${Math.round(v)}` : v.toFixed(2))}
-                      onChange={(v) => onParam(m.id, p.id, v)}
-                    />
-                  ))}
-                </div>
+                <>
+                  {m.type === 'sampler' && (
+                    <select
+                      className="sampler-select"
+                      value={samplerSound[m.id] ?? 'k_808'}
+                      onChange={(e) => setSamplerSound(m.id, e.target.value)}
+                      aria-label="Sampler sound"
+                    >
+                      {DRUM_CATEGORIES.map((cat) => (
+                        <optgroup key={cat} label={cat}>
+                          {DRUM_CATALOG.filter((s) => s.category === cat).map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  )}
+                  <div className="module-knobs">
+                    {def.params.map((p) => (
+                      <Knob
+                        key={p.id}
+                        label={p.label}
+                        color={def.accent}
+                        value={params[m.id]?.[p.id] ?? p.default}
+                        min={p.min}
+                        max={p.max}
+                        size={42}
+                        format={(v) => (p.unit === 'Hz' ? `${Math.round(v)}` : v.toFixed(2))}
+                        onChange={(v) => onParam(m.id, p.id, v)}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
 
               {def.waveform && (

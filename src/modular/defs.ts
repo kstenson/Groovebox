@@ -17,6 +17,7 @@ export type ModuleType =
   | 'drive'
   | 'atten'
   | 'seq'
+  | 'sampler'
 
 export type JackKind = 'audioOut' | 'cvOut' | 'audioIn' | 'cvIn' | 'gateOut' | 'gateIn'
 
@@ -229,6 +230,21 @@ export const MODULE_DEFS: Record<ModuleType, ModuleDef> = {
       { id: 'gate', label: 'GATE', kind: 'gateOut' },
     ],
     params: [],
+  },
+  sampler: {
+    type: 'sampler',
+    name: 'SAMPLER',
+    accent: '#36d1c4',
+    removable: true,
+    // Sound selection is a custom dropdown; trig plays the one-shot.
+    jacks: [
+      { id: 'trig', label: 'TRIG', kind: 'gateIn' },
+      { id: 'out', label: 'OUT', kind: 'audioOut' },
+    ],
+    params: [
+      { id: 'gain', label: 'GAIN', min: 0, max: 1.5, default: 0.9 },
+      { id: 'speed', label: 'SPEED', min: 0.25, max: 2, default: 1 },
+    ],
   },
 }
 
